@@ -16,5 +16,7 @@ func Init() *sql.DB {
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Veritabanı erişilemedi: %v", err)
 	}
+
+	log.Printf("Veritabanı bağlantısı başarılı: go_example")
 	return db
 }

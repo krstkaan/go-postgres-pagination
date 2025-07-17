@@ -10,15 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ServerHandler struct {
-	service service.ServerService
+type VMHandler struct {
+	service service.VMService
 }
 
-func NewServerHandler(s service.ServerService) *ServerHandler {
-	return &ServerHandler{s}
+func NewVMHandler(s service.VMService) *VMHandler {
+	return &VMHandler{s}
 }
 
-func (h *ServerHandler) GetServers(c *gin.Context) {
+func (h *VMHandler) GetVMs(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page < 1 {
 		page = 1
@@ -28,12 +28,12 @@ func (h *ServerHandler) GetServers(c *gin.Context) {
 		limit = 10
 	}
 
-	// Çoklu filtre desteği
+	// Multi-filter support
 	filters := map[string][]string{}
 	for key, values := range c.Request.URL.Query() {
 		if len(values) > 0 && len(key) > 7 && key[:7] == "search[" && key[len(key)-1:] == "]" {
 			column := key[7 : len(key)-1]
-			// Değerleri virgülle ayır
+			// Split values by comma
 			filterValues := []string{}
 			for _, raw := range values {
 				for _, val := range splitCSV(raw) {
@@ -44,7 +44,7 @@ func (h *ServerHandler) GetServers(c *gin.Context) {
 		}
 	}
 
-	result, err := h.service.GetPaginatedServers(c.Request.Context(), page, limit, filters)
+	result, err := h.service.GetPaginatedVMs(c.Request.Context(), page, limit, filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -53,15 +53,7 @@ func (h *ServerHandler) GetServers(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func splitCSV(s string) []string {
-	parts := strings.Split(s, ",")
-	for i := range parts {
-		parts[i] = strings.TrimSpace(parts[i])
-	}
-	return parts
-}
-
-func (h *ServerHandler) SearchServers(c *gin.Context) {
+func (h *VMHandler) SearchVMs(c *gin.Context) {
 	column := c.Query("column")
 	query := c.Query("query")
 	limitStr := c.DefaultQuery("limit", "10")
@@ -76,14 +68,18 @@ func (h *ServerHandler) SearchServers(c *gin.Context) {
 		limit = 10
 	}
 
-	// Güvenlik için sadece belirli kolonlarda arama yapalım
+	// Security: only allow searching in specific columns
 	allowedColumns := map[string]bool{
-		"customer_name": true,
-		"name":          true,
-		"ip_address":    true,
-		"cpu":           true,
-		"memory":        true,
-		"status":        true,
+		"vmid":             true,
+		"hypervisor":       true,
+		"name":             true,
+		"status":           true,
+		"node":             true,
+		"cluster":          true,
+		"datacenter":       true,
+		"guestos":          true,
+		"hypervisor_agent": true,
+		"tags":             true,
 	}
 
 	if !allowedColumns[column] {
@@ -104,24 +100,31 @@ func (h *ServerHandler) SearchServers(c *gin.Context) {
 	})
 }
 
-func (h *ServerHandler) GetServerByID(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid server ID"})
+func (h *VMHandler) GetVMByID(c *gin.Context) {
+	vmid := c.Param("id")
+	if vmid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid VM ID"})
 		return
 	}
 
-	server, err := h.service.GetServerByID(c.Request.Context(), id)
+	vm, err := h.service.GetVMByID(c.Request.Context(), vmid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if server == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Server not found"})
+	if vm == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "VM not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, server)
+	c.JSON(http.StatusOK, vm)
+}
+
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }

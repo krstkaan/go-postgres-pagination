@@ -12,21 +12,31 @@ import (
 func main() {
 	database := db.Init()
 
-	repo := repository.NewServerRepository(database)
-	svc := service.NewServerService(repo)
-	h := handler.NewServerHandler(svc)
+	// VM endpoints
+	vmRepo := repository.NewVMRepository(database)
+	vmSvc := service.NewVMService(vmRepo)
+	vmHandler := handler.NewVMHandler(vmSvc)
 
 	router := gin.Default()
 
+	// CORS middleware
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
 		c.Next()
 	})
 
-	router.GET("/api/servers", h.GetServers)
-	router.GET("/api/servers/search", h.SearchServers) // Yeni eklenen route
-	router.GET("/api/servers/:id", h.GetServerByID)    // ID'ye göre server getiren route
+	// New VM endpoints
+	router.GET("/api/vms", vmHandler.GetVMs)
+	router.GET("/api/vms/search", vmHandler.SearchVMs)
+	router.GET("/api/vms/:id", vmHandler.GetVMByID)
 
 	router.Run("0.0.0.0:5000")
-
 }
